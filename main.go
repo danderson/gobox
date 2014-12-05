@@ -31,22 +31,22 @@ func readKeyFile(path string) *[32]byte {
 
 func main() {
 	keys := func(cmd *kingpin.CmdClause) {
-		cmd.Arg("pubkey", "Public key file").Required().StringVar(&pubFile)
-		cmd.Arg("seckey", "Secret key file").Required().StringVar(&secFile)
+		cmd.Arg("pubkey", "Public key file.").Required().StringVar(&pubFile)
+		cmd.Arg("seckey", "Secret key file.").Required().StringVar(&secFile)
 	}
 
-	cmd := kingpin.Command("genkey", "Generate a key pair")
+	cmd := kingpin.Command("genkey", "Generate a key pair and write them to the given files.")
 	keys(cmd)
 
-	cmd = kingpin.Command("encrypt", "Encrypt a file")
+	cmd = kingpin.Command("encrypt", "Encrypt a file FROM seckey (you) TO pubkey (peer)")
 	keys(cmd)
-	cmd.Arg("plaintext", "Plaintext").Required().ExistingFileVar(&plaintextFile)
-	cmd.Arg("ciphertext", "Ciphertext").Required().StringVar(&ciphertextFile)
+	cmd.Arg("input-file", "The file to encrypt.").Required().ExistingFileVar(&plaintextFile)
+	cmd.Arg("output-file", "Destination path for the encrypted content.").Required().StringVar(&ciphertextFile)
 
-	cmd = kingpin.Command("decrypt", "Decrypt a file")
+	cmd = kingpin.Command("decrypt", "Decrypt a file FROM pubkey (peer) TO seckey (you)")
 	keys(cmd)
-	cmd.Arg("ciphertext", "Ciphertext").Required().ExistingFileVar(&plaintextFile)
-	cmd.Arg("plaintext", "Plaintext").Required().StringVar(&ciphertextFile)
+	cmd.Arg("input-file", "The file to decrypt.").Required().ExistingFileVar(&plaintextFile)
+	cmd.Arg("output-file", "Destination path for the decrypted content.").Required().StringVar(&ciphertextFile)
 
 	switch kingpin.Parse() {
 	case "genkey":
