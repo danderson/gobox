@@ -18,12 +18,34 @@ var (
 	ciphertextFile string
 )
 
-func readKeyFile(path string) *[32]byte {
+type keyType byte
+
+func (k keyType) String() string {
+	switch k {
+	case 'P':
+		return "public"
+	case 'S':
+		return "secret"
+	default:
+		return "unknown"
+	}
+}
+
+const (
+	keyPub keyType = 'P'
+	keySec         = 'S'
+)
+
+func readKeyFile(path string, kt keyType) *[32]byte {
 	var ret [32]byte
 	c, err := ioutil.ReadFile(path)
 	kingpin.FatalIfError(err, fmt.Sprintf("Reading key file %q", path))
-	if len(c) != 32 {
+	if len(c) != 33 {
 		kingpin.Fatalf("Invalid key file %q (wrong size)", path)
+	}
+	at := keyType(c[32])
+	if at != kt {
+		kingpin.Fatalf("Wrong key type in %q: wanted %q, but got %q (did you switch the public and private key files on the commandline?)", path, kt, at)
 	}
 	copy(ret[:], c)
 	return &ret
@@ -52,12 +74,12 @@ func main() {
 	case "genkey":
 		pub, sec, err := box.GenerateKey(rand.Reader)
 		kingpin.FatalIfError(err, "Error generating keypair")
-		kingpin.FatalIfError(ioutil.WriteFile(pubFile, pub[:], 0644), "Writing public key")
-		kingpin.FatalIfError(ioutil.WriteFile(secFile, sec[:], 0600), "Writing secret key")
+		kingpin.FatalIfError(ioutil.WriteFile(pubFile, append(pub[:], byte(keyPub)), 0644), "Writing public key")
+		kingpin.FatalIfError(ioutil.WriteFile(secFile, append(sec[:], byte(keySec)), 0600), "Writing secret key")
 
 	case "encrypt":
-		pub := readKeyFile(pubFile)
-		sec := readKeyFile(secFile)
+		pub := readKeyFile(pubFile, keyPub)
+		sec := readKeyFile(secFile, keySec)
 		plain, err := ioutil.ReadFile(plaintextFile)
 		kingpin.FatalIfError(err, "Reading plaintext file")
 		var nonce [24]byte
@@ -67,8 +89,8 @@ func main() {
 		kingpin.FatalIfError(ioutil.WriteFile(ciphertextFile, cipher, 0644), "Writing ciphertext")
 
 	case "decrypt":
-		pub := readKeyFile(pubFile)
-		sec := readKeyFile(secFile)
+		pub := readKeyFile(pubFile, keyPub)
+		sec := readKeyFile(secFile, keySec)
 		nonceAndCipher, err := ioutil.ReadFile(ciphertextFile)
 		kingpin.FatalIfError(err, "Reading ciphertext file")
 		var nonce [24]byte
