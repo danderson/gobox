@@ -1,19 +1,25 @@
 # gobox - authenticated encryption CLI
 
 Gobox is a trivial CLI wrapper around the excellent
-[golang.org/x/crypto/nacl/box](https://godoc.org/golang.org/x/crypto/nacl/box)
-library, itself an implementation of the excellent `box` abstraction
-from djb et al.'s excellent [NaCl](http://nacl.cr.yp.to/) crypto
-library.
+[golang.org/x/crypto/nacl](https://godoc.org/golang.org/x/crypto/nacl)
+library, itself an implementation of djb et al.'s excellent
+[NaCl](http://nacl.cr.yp.to/) crypto library.
 
-NaCl box implements fast, secure and non-surprising authenticated
-encryption using a public/private key pair. Using your private key and
-a peer's public key, you _seal_ a message to that user from you. That
-sealed box can only be _opened_ by that peer, if they provide their
-private key and your public key. The API is deliberately devoid of
-knobs and settings, allowing only those two operations, seal and open.
+NaCl implements fast, secure and non-surprising authenticated
+encryption using either a symmetric key, or a public/private key
+pair.
 
-Gobox just surfaces those two primitives (plus `keygen` to produce key
+Using `secretbox`, you _seal_ a message using a symmetric key, and
+_open_ it with the same key.
+
+Using `box`, you _seal_ a message to a user (with their public key)
+from you (with your private key). That sealed box can only be _opened_
+by that user, if they provide their private key and your public key.
+
+The APIs are deliberately devoid of knobs and settings, allowing only
+those two operations, seal and open.
+
+Gobox just surfaces two primitives (plus `keygen` to produce key
 pairs) to the commandline.
 
 ### CLI
@@ -39,25 +45,51 @@ Commands:
 
   decrypt <pubkey> <seckey> <input-file> <output-file>
     Decrypt a file FROM pubkey (peer) TO seckey (you)
+
+  sym-encrypt <input-file> <output-file>
+    Encrypt a file with a passphrase
+
+  sym-decrypt <input-file> <output-file>
+    Decrypt a file with a passphrase
 ```
 
-### Generate a keypair
+### Public key crypto (`box`)
+
+#### Generate a keypair
 
 ```console
 $ gobox keygen alice.pub alice.sec
 ```
 
-### Encrypt a file
+#### Encrypt a file
 
 ```console
 $ echo "Eve is listening" >plaintext
 $ gobox encrypt bob.pub alice.sec plaintext ciphertext
 ```
 
-### Decrypt a file
+#### Decrypt a file
 
 ```console
 $ gobox decrypt alice.pub bob.sec ciphertext plaintext
-$ echo plaintext
+$ cat plaintext
+Eve is listening
+```
+
+
+### Symmetric crypto (`secretbox`)
+
+#### Encrypt a file
+
+```console
+$ echo "Eve is listening" >plaintext
+$ gobox sym-encrypt plaintext ciphertext
+```
+
+#### Decrypt a file
+
+```console
+$ gobox sym-decrypt ciphertext plaintext
+$ cat plaintext
 Eve is listening
 ```
