@@ -196,6 +196,14 @@ func main() {
 	cmd.Arg("input-file", "The file to decrypt.").Required().ExistingFileVar(&ciphertextFile)
 	cmd.Arg("output-file", "Destination path for the decrypted content.").Required().StringVar(&plaintextFile)
 
+	cmd = kingpin.Command("sym-encrypt", "Encrypt a file with a passphrase")
+	cmd.Arg("input-file", "The file to encrypt.").Required().ExistingFileVar(&plaintextFile)
+	cmd.Arg("output-file", "Destination path for the encrypted content.").Required().StringVar(&ciphertextFile)
+
+	cmd = kingpin.Command("sym-decrypt", "Decrypt a file with a passphrase")
+	cmd.Arg("input-file", "The file to decrypt.").Required().ExistingFileVar(&ciphertextFile)
+	cmd.Arg("output-file", "Destination path for the decrypted content.").Required().StringVar(&plaintextFile)
+
 	switch kingpin.Parse() {
 	case "genkey":
 		pub, priv, err := genKey()
@@ -230,6 +238,46 @@ func main() {
 		plain, ok := box.Open(nil, nonceAndCipher[24:], &nonce, pub, priv)
 		if !ok {
 			kingpin.Fatalf("Decryption of %q failed (wrong keys?)", ciphertextFile)
+		}
+		kingpin.FatalIfError(ioutil.WriteFile(plaintextFile, plain, 0600), "Writing plaintext")
+
+	case "sym-encrypt":
+		plain, err := ioutil.ReadFile(plaintextFile)
+		kingpin.FatalIfError(err, "Reading plaintext file")
+
+		out := make([]byte, 24+24+len(plain)+secretbox.Overhead)
+
+		passphrase, err := getPassphrase(true)
+		kingpin.FatalIfError(err, "Reading passphrase")
+		_, err = io.ReadFull(rand.Reader, out[:24])
+		kingpin.FatalIfError(err, "Reading randomness")
+		symmetricKey, err := mkScrypt(passphrase, out[:24])
+		kingpin.FatalIfError(err, "Deriving encryption key")
+
+		var nonce [24]byte
+		_, err = io.ReadFull(rand.Reader, nonce[:])
+		kingpin.FatalIfError(err, "Reading randomness")
+		copy(out[24:48], nonce[:])
+		secretbox.Seal(out[:48], plain, &nonce, symmetricKey)
+		kingpin.FatalIfError(ioutil.WriteFile(ciphertextFile, out, 0644), "Writing ciphertext")
+
+	case "sym-decrypt":
+		cipher, err := ioutil.ReadFile(ciphertextFile)
+		kingpin.FatalIfError(err, "Reading ciphertext file")
+		if len(cipher) < 48 {
+			kingpin.Fatalf("Ciphertext file too short")
+		}
+
+		passphrase, err := getPassphrase(false)
+		kingpin.FatalIfError(err, "Reading passphrase")
+		symmetricKey, err := mkScrypt(passphrase, cipher[:24])
+		kingpin.FatalIfError(err, "Deriving encryption key")
+
+		var nonce [24]byte
+		copy(nonce[:], cipher[24:48])
+		plain, ok := secretbox.Open(nil, cipher[48:], &nonce, symmetricKey)
+		if !ok {
+			kingpin.Fatalf("Decryption of %q failed (bad passphrase?)", ciphertextFile)
 		}
 		kingpin.FatalIfError(ioutil.WriteFile(plaintextFile, plain, 0600), "Writing plaintext")
 	}
