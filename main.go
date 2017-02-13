@@ -10,6 +10,7 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
+	"strings"
 
 	"golang.org/x/crypto/nacl/box"
 	"golang.org/x/crypto/nacl/secretbox"
@@ -174,6 +175,9 @@ func getPassphrase(repeat bool) (string, error) {
 			return "", errors.New("Passphrases do not match")
 		}
 	}
+
+	passphrase = strings.TrimRight(passphrase, "\n")
+
 	return passphrase, err
 }
 
